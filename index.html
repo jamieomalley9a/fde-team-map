@@ -682,6 +682,23 @@
         });
 
         let markers = [];
+        let spinEnabled = true;
+        let userInteracted = false;
+
+        // Slow globe spin animation
+        function spinGlobe() {
+            if (!spinEnabled || userInteracted) return;
+            
+            const center = map.getCenter();
+            center.lng -= 0.2; // Adjust speed here (lower = slower)
+            map.setCenter(center);
+            requestAnimationFrame(spinGlobe);
+        }
+
+        // Stop spinning on user interaction
+        map.on('mousedown', () => { userInteracted = true; });
+        map.on('touchstart', () => { userInteracted = true; });
+        map.on('wheel', () => { userInteracted = true; });
 
         function addMarkers(teamData) {
             markers.forEach(m => m.remove());
@@ -758,6 +775,10 @@
                 
                 setTimeout(() => {
                     map.flyTo({ center: [10, 45], zoom: 3.5, duration: 2000 });
+                    // Start slow spin after fly-to completes
+                    setTimeout(() => {
+                        spinGlobe();
+                    }, 2500);
                 }, 500);
             } catch (error) {
                 console.error('Error:', error);

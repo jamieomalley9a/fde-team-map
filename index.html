@@ -271,39 +271,51 @@
         
         function loadSheetData() {
             return new Promise((resolve, reject) => {
-                const callbackName = 'googleSheetCallback_' + Date.now();
-                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${callbackName}`;
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
                 
-                window[callbackName] = function(response) {
-                    try {
-                        const rows = response.table.rows;
-                        const cols = response.table.cols;
+                fetch(url)
+                    .then(response => response.text())
+                    .then(text => {
+                        // Google wraps the JSON in a function call, strip it
+                        const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+                        if (!jsonString || !jsonString[1]) {
+                            throw new Error('Invalid response format');
+                        }
                         
-                        // Get column headers
-                        const headers = cols.map(col => (col.label || '').toLowerCase().trim());
+                        const data = JSON.parse(jsonString[1]);
+                        const rows = data.table.rows;
+                        const cols = data.table.cols;
+                        
+                        // Get column headers from first row or col labels
+                        let headers = cols.map(col => (col.label || '').toLowerCase().trim());
+                        
+                        // If headers are empty, try to get from first row
+                        if (headers.every(h => !h)) {
+                            if (rows.length > 0) {
+                                headers = rows[0].c.map(cell => cell ? (cell.v || '').toString().toLowerCase().trim() : '');
+                                rows.shift(); // Remove header row from data
+                            }
+                        }
                         
                         // Parse data rows
-                        const data = rows.map(row => {
+                        const result = rows.map(row => {
                             const obj = {};
-                            row.c.forEach((cell, i) => {
-                                const header = headers[i] || `col${i}`;
-                                obj[header] = cell ? (cell.v || '') : '';
-                            });
+                            if (row.c) {
+                                row.c.forEach((cell, i) => {
+                                    const header = headers[i] || `col${i}`;
+                                    obj[header] = cell ? (cell.v || '') : '';
+                                });
+                            }
                             return obj;
-                        }).filter(row => row.name); // Filter out empty rows
+                        }).filter(row => row.name && row.name.toString().trim()); // Filter out empty rows
                         
-                        delete window[callbackName];
-                        document.body.removeChild(script);
-                        resolve(data);
-                    } catch (e) {
-                        reject(e);
-                    }
-                };
-                
-                const script = document.createElement('script');
-                script.src = url;
-                script.onerror = () => reject(new Error('Failed to load sheet'));
-                document.body.appendChild(script);
+                        console.log('Loaded', result.length, 'team members');
+                        resolve(result);
+                    })
+                    .catch(err => {
+                        console.error('Fetch error:', err);
+                        reject(err);
+                    });
             });
         }
 

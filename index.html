@@ -171,6 +171,98 @@
         }
         .error-message h2 { color: var(--accent-red); margin-bottom: 8px; }
         .error-message p { color: var(--text-secondary); font-size: 14px; }
+
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed; top: 24px; right: 32px; z-index: 100;
+            display: flex; align-items: center; gap: 10px;
+            background: var(--bg-card); border: 1px solid var(--border-subtle);
+            border-radius: 10px; padding: 8px 14px;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .theme-toggle:hover { background: var(--bg-card-hover); }
+        .theme-toggle-label { font-size: 12px; color: var(--text-secondary); }
+        .theme-toggle-switch {
+            width: 44px; height: 24px;
+            background: var(--border-subtle); border-radius: 12px;
+            position: relative; transition: background 0.3s ease;
+        }
+        .theme-toggle-switch::after {
+            content: '☀️'; position: absolute;
+            width: 20px; height: 20px; top: 2px; left: 2px;
+            background: var(--bg-card); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; transition: all 0.3s ease;
+        }
+        .theme-toggle.light .theme-toggle-switch { background: var(--accent-red); }
+        .theme-toggle.light .theme-toggle-switch::after { left: 22px; content: '🌙'; }
+
+        /* Team roster panel */
+        .roster-toggle {
+            position: fixed; bottom: 24px; right: 24px; z-index: 100;
+            background: var(--bg-card); border: 1px solid var(--border-subtle);
+            border-radius: 12px; padding: 12px 16px;
+            cursor: pointer; display: flex; align-items: center; gap: 8px;
+            font-size: 13px; font-weight: 500; color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+        .roster-toggle:hover { background: var(--bg-card-hover); }
+        .roster-toggle svg { width: 18px; height: 18px; color: var(--accent-red); }
+
+        .roster-panel {
+            position: fixed; top: 0; right: -360px; bottom: 0; width: 360px;
+            background: var(--bg-dark); border-left: 1px solid var(--border-subtle);
+            z-index: 200; transition: right 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .roster-panel.open { right: 0; }
+        .roster-header {
+            padding: 20px; border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .roster-title { font-size: 16px; font-weight: 600; }
+        .roster-close {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: var(--bg-card); border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-muted); font-size: 18px; transition: all 0.2s;
+        }
+        .roster-close:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .roster-search {
+            margin: 16px 20px; padding: 10px 14px;
+            background: var(--bg-card); border: 1px solid var(--border-subtle);
+            border-radius: 8px; color: var(--text-primary); font-size: 14px;
+            outline: none; width: calc(100% - 40px);
+        }
+        .roster-search::placeholder { color: var(--text-muted); }
+        .roster-search:focus { border-color: var(--accent-red); }
+        .roster-list {
+            flex: 1; overflow-y: auto; padding: 0 12px 20px;
+        }
+        .roster-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; margin: 4px 0; border-radius: 10px;
+            cursor: pointer; transition: all 0.15s ease;
+        }
+        .roster-item:hover { background: var(--bg-card); }
+        .roster-item-avatar {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-red) 0%, #ff4d4d 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700; color: white; flex-shrink: 0;
+        }
+        .roster-item-info { flex: 1; min-width: 0; }
+        .roster-item-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .roster-item-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+        .roster-item-flags { font-size: 14px; }
+        .roster-count { padding: 8px 20px; font-size: 12px; color: var(--text-muted); }
+
+        /* Light theme overrides */
+        body.light-theme { --bg-dark: #f5f5f7; --bg-card: #ffffff; --bg-card-hover: #f0f0f2; --text-primary: #1a1a1a; --text-secondary: #666666; --text-muted: #999999; --border-subtle: rgba(0, 0, 0, 0.1); }
+        body.light-theme .header { background: linear-gradient(180deg, rgba(245, 245, 247, 0.95) 0%, rgba(245, 245, 247, 0) 100%); }
+        body.light-theme .cluster-marker { border-color: #ffffff; }
+        body.light-theme .single-marker { border-color: #ffffff; }
+        body.light-theme .roster-panel { background: #f5f5f7; }
     </style>
 </head>
 <body>
@@ -207,7 +299,138 @@
         <div class="legend-item"><div class="legend-cluster">3</div><span>Multiple members</span></div>
     </div>
 
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+        <span class="theme-toggle-label">Light mode</span>
+        <div class="theme-toggle-switch"></div>
+    </div>
+
+    <div class="roster-toggle" id="rosterToggle" onclick="openRoster()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.25 6.75a3.75 3.75 0 1 1 7.5 0 3.75 3.75 0 0 1-7.5 0ZM15.75 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM2.25 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM6.31 15.117A6.745 6.745 0 0 1 12 12a6.745 6.745 0 0 1 6.709 7.498.75.75 0 0 1-.372.568A12.696 12.696 0 0 1 12 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 0 1-.372-.568 6.787 6.787 0 0 1 1.019-4.38Z" clip-rule="evenodd" />
+            <path d="M5.082 14.254a8.287 8.287 0 0 0-1.308 5.135 9.687 9.687 0 0 1-1.764-.44l-.115-.04a.563.563 0 0 1-.373-.487l-.01-.121a3.75 3.75 0 0 1 3.57-4.047ZM20.226 19.389a8.287 8.287 0 0 0-1.308-5.135 3.75 3.75 0 0 1 3.57 4.047l-.01.121a.563.563 0 0 1-.373.486l-.115.04c-.567.2-1.156.349-1.764.441Z" />
+        </svg>
+        <span>Team Roster</span>
+    </div>
+
+    <div class="roster-panel" id="rosterPanel">
+        <div class="roster-header">
+            <span class="roster-title">Team Roster</span>
+            <button class="roster-close" onclick="closeRoster()">×</button>
+        </div>
+        <input type="text" class="roster-search" id="rosterSearch" placeholder="Search by name, city, or language..." oninput="filterRoster()">
+        <div class="roster-count" id="rosterCount">Loading...</div>
+        <div class="roster-list" id="rosterList"></div>
+    </div>
+
     <script>
+        // =====================================================
+        // THEME TOGGLE
+        // =====================================================
+        let isLightTheme = false;
+
+        function toggleTheme() {
+            isLightTheme = !isLightTheme;
+            document.body.classList.toggle('light-theme', isLightTheme);
+            document.getElementById('themeToggle').classList.toggle('light', isLightTheme);
+            
+            // Change map style
+            const style = isLightTheme ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+            map.setStyle(style);
+            
+            // Re-apply fog after style change
+            map.once('style.load', () => {
+                if (isLightTheme) {
+                    map.setFog({
+                        color: 'rgb(220, 220, 225)',
+                        'high-color': 'rgb(180, 200, 220)',
+                        'horizon-blend': 0.05,
+                        'space-color': 'rgb(200, 210, 220)',
+                        'star-intensity': 0.0
+                    });
+                } else {
+                    map.setFog({
+                        color: 'rgb(10, 10, 15)',
+                        'high-color': 'rgb(20, 20, 30)',
+                        'horizon-blend': 0.08,
+                        'space-color': 'rgb(5, 5, 10)',
+                        'star-intensity': 0.6
+                    });
+                }
+                // Re-add markers after style change
+                if (window.currentTeamData) {
+                    addMarkers(window.currentTeamData);
+                }
+            });
+        }
+
+        // =====================================================
+        // TEAM ROSTER
+        // =====================================================
+        let allTeamData = [];
+
+        function openRoster() {
+            document.getElementById('rosterPanel').classList.add('open');
+        }
+
+        function closeRoster() {
+            document.getElementById('rosterPanel').classList.remove('open');
+        }
+
+        function renderRoster(data) {
+            const list = document.getElementById('rosterList');
+            const count = document.getElementById('rosterCount');
+            
+            count.textContent = `${data.length} team member${data.length !== 1 ? 's' : ''}`;
+            
+            list.innerHTML = data.map(member => {
+                const flags = member.languages.map(l => languageFlags[l.toLowerCase()] || '🌐').join('');
+                return `
+                    <div class="roster-item" onclick="zoomToMember('${member.lat}', '${member.lng}', '${member.name.replace(/'/g, "\\'")}')">
+                        <div class="roster-item-avatar">${getInitials(member.name)}</div>
+                        <div class="roster-item-info">
+                            <div class="roster-item-name">${member.name}</div>
+                            <div class="roster-item-detail">${member.city} · ${member.role}</div>
+                        </div>
+                        <div class="roster-item-flags">${flags}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterRoster() {
+            const query = document.getElementById('rosterSearch').value.toLowerCase();
+            if (!query) {
+                renderRoster(allTeamData);
+                return;
+            }
+            const filtered = allTeamData.filter(m => 
+                m.name.toLowerCase().includes(query) ||
+                m.city.toLowerCase().includes(query) ||
+                m.role.toLowerCase().includes(query) ||
+                m.languages.some(l => l.toLowerCase().includes(query))
+            );
+            renderRoster(filtered);
+        }
+
+        function zoomToMember(lat, lng, name) {
+            closeRoster();
+            map.flyTo({
+                center: [parseFloat(lng), parseFloat(lat)],
+                zoom: 6,
+                duration: 1500
+            });
+            // Find and open the marker popup
+            setTimeout(() => {
+                markers.forEach(marker => {
+                    const markerLngLat = marker.getLngLat();
+                    if (Math.abs(markerLngLat.lat - parseFloat(lat)) < 0.01 && 
+                        Math.abs(markerLngLat.lng - parseFloat(lng)) < 0.01) {
+                        marker.togglePopup();
+                    }
+                });
+            }, 1600);
+        }
+
         // =====================================================
         // CONFIGURATION - Edit these values to update the map
         // =====================================================
@@ -495,6 +718,11 @@
                 
                 document.querySelector('.loading-text').textContent = 'Processing...';
                 const teamData = processTeamData(rawData);
+                
+                // Store for roster and theme toggle
+                window.currentTeamData = teamData;
+                allTeamData = [...teamData].sort((a, b) => a.name.localeCompare(b.name));
+                renderRoster(allTeamData);
                 
                 addMarkers(teamData);
                 document.getElementById('loadingOverlay').classList.add('hidden');

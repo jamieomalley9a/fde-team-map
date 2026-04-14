@@ -690,7 +690,7 @@
             if (!spinEnabled || userInteracted) return;
             
             const center = map.getCenter();
-            center.lng -= 0.2; // Adjust speed here (lower = slower)
+            center.lng += 0.2; // Adjust speed here (lower = slower)
             map.setCenter(center);
             requestAnimationFrame(spinGlobe);
         }

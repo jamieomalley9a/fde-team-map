@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDE Team Global Map</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #141419;
+            --bg-card-hover: #1a1a22;
+            --accent-red: #eb1700;
+            --accent-red-glow: rgba(235, 23, 0, 0.4);
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(235, 23, 0, 0.3);
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--accent-red);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 16px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 24px 32px;
+            background: linear-gradient(180deg, rgba(10, 10, 15, 0.95) 0%, rgba(10, 10, 15, 0) 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .header-left h1 {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: 28px;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .header-left h1 span {
+            color: var(--accent-red);
+        }
+
+        .header-left p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .stat {
+            text-align: right;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 4px;
+        }
+
+        /* Cluster markers */
+        .cluster-marker {
+            background: var(--accent-red);
+            border: 3px solid var(--bg-dark);
+            border-radius: 50%;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px var(--accent-red-glow), 0 0 0 0 var(--accent-red-glow);
+            animation: pulse 2s infinite;
+        }
+
+        .cluster-marker:hover {
+            transform: scale(1.15);
+            box-shadow: 0 6px 30px var(--accent-red-glow);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 20px var(--accent-red-glow), 0 0 0 0 var(--accent-red-glow); }
+            50% { box-shadow: 0 4px 20px var(--accent-red-glow), 0 0 0 8px rgba(235, 23, 0, 0); }
+        }
+
+        /* Single marker */
+        .single-marker {
+            width: 16px;
+            height: 16px;
+            background: var(--accent-red);
+            border: 3px solid var(--bg-dark);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px var(--accent-red-glow);
+        }
+
+        .single-marker:hover {
+            transform: scale(1.4);
+            box-shadow: 0 6px 24px var(--accent-red-glow);
+        }
+
+        /* Popup */
+        .mapboxgl-popup {
+            max-width: 340px !important;
+        }
+
+        .mapboxgl-popup-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 0;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .mapboxgl-popup-close-button {
+            color: var(--text-muted);
+            font-size: 20px;
+            padding: 12px 16px;
+            right: 0;
+            top: 0;
+        }
+
+        .mapboxgl-popup-close-button:hover {
+            background: transparent;
+            color: var(--text-primary);
+        }
+
+        .mapboxgl-popup-tip {
+            border-top-color: var(--bg-card) !important;
+        }
+
+        .popup-content {
+            padding: 24px;
+        }
+
+        .popup-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .popup-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--accent-red) 0%, #ff4d4d 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px var(--accent-red-glow);
+            overflow: hidden;
+        }
+
+        .popup-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .popup-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .popup-role {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .popup-divider {
+            height: 1px;
+            background: var(--border-subtle);
+            margin: 0 -24px 20px;
+        }
+
+        .popup-section {
+            margin-bottom: 16px;
+        }
+
+        .popup-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .popup-section-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .popup-location {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .popup-location svg {
+            width: 16px;
+            height: 16px;
+            color: var(--accent-red);
+        }
+
+        .popup-languages {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .language-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .language-flag {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        /* City list popup */
+        .city-popup-content {
+            padding: 20px;
+        }
+
+        .city-popup-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .city-popup-header svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent-red);
+        }
+
+        .city-popup-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .city-popup-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .city-member-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .city-member-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .city-member-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .city-member-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-red) 0%, #ff4d4d 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .city-member-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .city-member-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .city-member-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .city-member-role {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .city-member-languages {
+            display: flex;
+            gap: 2px;
+            font-size: 14px;
+        }
+
+        /* Legend */
+        .legend {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            z-index: 100;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            gap: 24px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--accent-red);
+            border-radius: 50%;
+            box-shadow: 0 2px 8px var(--accent-red-glow);
+        }
+
+        .legend-cluster {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-red);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+        }
+
+        /* Scrollbar */
+        .city-member-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .city-member-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .city-member-list::-webkit-scrollbar-thumb {
+            background: var(--border-subtle);
+            border-radius: 3px;
+        }
+
+        /* Controls styling */
+        .mapboxgl-ctrl-group {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-subtle) !important;
+            border-radius: 10px !important;
+            overflow: hidden;
+        }
+
+        .mapboxgl-ctrl-group button {
+            background: var(--bg-card) !important;
+            border-color: var(--border-subtle) !important;
+        }
+
+        .mapboxgl-ctrl-group button:hover {
+            background: var(--bg-card-hover) !important;
+        }
+
+        .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+            filter: invert(1);
+        }
+
+        /* Error state */
+        .error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-card);
+            border: 1px solid var(--accent-red);
+            border-radius: 12px;
+            padding: 24px 32px;
+            text-align: center;
+            z-index: 9999;
+        }
+
+        .error-message h2 {
+            color: var(--accent-red);
+            margin-bottom: 8px;
+        }
+
+        .error-message p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading team data...</div>
+    </div>
+
+    <div id="map"></div>
+    
+    <div class="header">
+        <div class="header-left">
+            <h1>Firefly <span>FDE</span> Team</h1>
+            <p>Forward Deployed Engineering — EMEA, APAC & Japan</p>
+        </div>
+        <div class="header-stats">
+            <div class="stat">
+                <div class="stat-value" id="statMembers">--</div>
+                <div class="stat-label">Team Members</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statCities">--</div>
+                <div class="stat-label">Cities</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statLanguages">--</div>
+                <div class="stat-label">Languages</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-dot"></div>
+            <span>Single member</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-cluster">3</div>
+            <span>Multiple members</span>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT67YnXDdrn4S6EmqfQkxxw_gIWYaGaV9dM3sOSy8BeAvV2oGAVU0vublvuu8Z9jXTsd-NF18gywTG1/pub?gid=1522407039&single=true&output=csv';
+        
+        mapboxgl.accessToken = 'pk.eyJ1IjoiamFvbWFsbGUiLCJhIjoiY21ueW53cGtlMDMwcTJwc2RnYWxvZXZ3ZSJ9.3vmNAjpySCnvviPHo_zArg';
+
+        // City coordinates lookup
+        const cityCoordinates = {
+            'london': { lat: 51.5074, lng: -0.1278 },
+            'paris': { lat: 48.8566, lng: 2.3522 },
+            'berlin': { lat: 52.5200, lng: 13.4050 },
+            'munich': { lat: 48.1351, lng: 11.5820 },
+            'sydney': { lat: -33.8688, lng: 151.2093 },
+            'tokyo': { lat: 35.6762, lng: 139.6503 },
+            'bucharest': { lat: 44.4268, lng: 26.1025 },
+            'riyadh': { lat: 24.7136, lng: 46.6753 },
+            'madrid': { lat: 40.4168, lng: -3.7038 },
+            'ottawa': { lat: 45.4215, lng: -75.6972 },
+            'cairo': { lat: 30.0444, lng: 31.2357 },
+            'warsaw': { lat: 52.2297, lng: 21.0122 },
+            'cardiff': { lat: 51.4816, lng: -3.1791 },
+            'brussels': { lat: 50.8503, lng: 4.3517 },
+            'amsterdam': { lat: 52.3676, lng: 4.9041 },
+            'dubai': { lat: 25.2048, lng: 55.2708 },
+            'singapore': { lat: 1.3521, lng: 103.8198 },
+            'hong kong': { lat: 22.3193, lng: 114.1694 },
+            'melbourne': { lat: -37.8136, lng: 144.9631 },
+            'toronto': { lat: 43.6532, lng: -79.3832 },
+            'new york': { lat: 40.7128, lng: -74.0060 },
+            'san francisco': { lat: 37.7749, lng: -122.4194 },
+            'los angeles': { lat: 34.0522, lng: -118.2437 },
+            'seattle': { lat: 47.6062, lng: -122.3321 },
+            'bangalore': { lat: 12.9716, lng: 77.5946 },
+            'mumbai': { lat: 19.0760, lng: 72.8777 },
+            'delhi': { lat: 28.6139, lng: 77.2090 },
+            'shanghai': { lat: 31.2304, lng: 121.4737 },
+            'beijing': { lat: 39.9042, lng: 116.4074 },
+            'seoul': { lat: 37.5665, lng: 126.9780 },
+            'lisbon': { lat: 38.7223, lng: -9.1393 },
+            'barcelona': { lat: 41.3851, lng: 2.1734 },
+            'rome': { lat: 41.9028, lng: 12.4964 },
+            'milan': { lat: 45.4642, lng: 9.1900 },
+            'vienna': { lat: 48.2082, lng: 16.3738 },
+            'zurich': { lat: 47.3769, lng: 8.5417 },
+            'stockholm': { lat: 59.3293, lng: 18.0686 },
+            'copenhagen': { lat: 55.6761, lng: 12.5683 },
+            'oslo': { lat: 59.9139, lng: 10.7522 },
+            'helsinki': { lat: 60.1699, lng: 24.9384 },
+            'dublin': { lat: 53.3498, lng: -6.2603 },
+            'edinburgh': { lat: 55.9533, lng: -3.1883 },
+            'manchester': { lat: 53.4808, lng: -2.2426 },
+            'birmingham': { lat: 52.4862, lng: -1.8904 },
+            'prague': { lat: 50.0755, lng: 14.4378 },
+            'budapest': { lat: 47.4979, lng: 19.0402 },
+            'athens': { lat: 37.9838, lng: 23.7275 },
+            'istanbul': { lat: 41.0082, lng: 28.9784 },
+            'tel aviv': { lat: 32.0853, lng: 34.7818 },
+            'cape town': { lat: -33.9249, lng: 18.4241 },
+            'johannesburg': { lat: -26.2041, lng: 28.0473 },
+            'nairobi': { lat: -1.2921, lng: 36.8219 },
+            'lagos': { lat: 6.5244, lng: 3.3792 },
+            'mexico city': { lat: 19.4326, lng: -99.1332 },
+            'sao paulo': { lat: -23.5505, lng: -46.6333 },
+            'buenos aires': { lat: -34.6037, lng: -58.3816 },
+            'lima': { lat: -12.0464, lng: -77.0428 },
+            'bogota': { lat: 4.7110, lng: -74.0721 },
+            'santiago': { lat: -33.4489, lng: -70.6693 },
+            'auckland': { lat: -36.8509, lng: 174.7645 },
+            'perth': { lat: -31.9505, lng: 115.8605 },
+            'brisbane': { lat: -27.4698, lng: 153.0251 },
+            'kuala lumpur': { lat: 3.1390, lng: 101.6869 },
+            'jakarta': { lat: -6.2088, lng: 106.8456 },
+            'bangkok': { lat: 13.7563, lng: 100.5018 },
+            'manila': { lat: 14.5995, lng: 120.9842 },
+            'hanoi': { lat: 21.0285, lng: 105.8542 },
+            'ho chi minh city': { lat: 10.8231, lng: 106.6297 },
+            'taipei': { lat: 25.0330, lng: 121.5654 }
+        };
+
+        // Language to flag mapping
+        const languageFlags = {
+            'english': '🇬🇧',
+            'french': '🇫🇷',
+            'german': '🇩🇪',
+            'spanish': '🇪🇸',
+            'japanese': '🇯🇵',
+            'arabic': '🇸🇦',
+            'romanian': '🇷🇴',
+            'polish': '🇵🇱',
+            'dutch': '🇳🇱',
+            'italian': '🇮🇹',
+            'portuguese': '🇵🇹',
+            'russian': '🇷🇺',
+            'chinese': '🇨🇳',
+            'mandarin': '🇨🇳',
+            'cantonese': '🇭🇰',
+            'korean': '🇰🇷',
+            'hindi': '🇮🇳',
+            'turkish': '🇹🇷',
+            'greek': '🇬🇷',
+            'swedish': '🇸🇪',
+            'norwegian': '🇳🇴',
+            'danish': '🇩🇰',
+            'finnish': '🇫🇮',
+            'czech': '🇨🇿',
+            'hungarian': '🇭🇺',
+            'hebrew': '🇮🇱',
+            'thai': '🇹🇭',
+            'vietnamese': '🇻🇳',
+            'indonesian': '🇮🇩',
+            'malay': '🇲🇾',
+            'tagalog': '🇵🇭',
+            'filipino': '🇵🇭',
+            'afrikaans': '🇿🇦',
+            'swahili': '🇰🇪',
+            'urdu': '🇵🇰',
+            'bengali': '🇧🇩',
+            'tamil': '🇮🇳',
+            'telugu': '🇮🇳',
+            'punjabi': '🇮🇳',
+            'gujarati': '🇮🇳',
+            'marathi': '🇮🇳',
+            'ukrainian': '🇺🇦',
+            'bulgarian': '🇧🇬',
+            'croatian': '🇭🇷',
+            'serbian': '🇷🇸',
+            'slovak': '🇸🇰',
+            'slovenian': '🇸🇮',
+            'estonian': '🇪🇪',
+            'latvian': '🇱🇻',
+            'lithuanian': '🇱🇹',
+            'georgian': '🇬🇪',
+            'armenian': '🇦🇲',
+            'persian': '🇮🇷',
+            'farsi': '🇮🇷'
+        };
+
+        // Parse CSV
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let char of lines[i]) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+                
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] || '';
+                });
+                
+                if (row.name) {
+                    data.push(row);
+                }
+            }
+            
+            return data;
+        }
+
+        // Process team data
+        function processTeamData(rawData) {
+            return rawData.map(row => {
+                const cityKey = (row.city || '').toLowerCase().trim();
+                const coords = cityCoordinates[cityKey] || { lat: 51.5074, lng: -0.1278 };
+                
+                const languages = (row.languages || 'English')
+                    .split(',')
+                    .map(l => l.trim())
+                    .filter(l => l.length > 0);
+                
+                return {
+                    name: row.name || 'Unknown',
+                    role: row.role || 'Team Member',
+                    city: row.city || 'London',
+                    country: row.country || 'United Kingdom',
+                    languages: languages,
+                    photo_url: row.photo_url || '',
+                    lat: coords.lat,
+                    lng: coords.lng
+                };
+            });
+        }
+
+        // Get initials from name
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+        }
+
+        // Create popup HTML for a single member
+        function createMemberPopup(member) {
+            const languagesHtml = member.languages.map(lang => {
+                const flag = languageFlags[lang.toLowerCase()] || '🌐';
+                return `<div class="language-tag">
+                    <span class="language-flag">${flag}</span>
+                    ${lang}
+                </div>`;
+            }).join('');
+
+            const avatarContent = member.photo_url 
+                ? `<img src="${member.photo_url}" alt="${member.name}" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
+                : getInitials(member.name);
+
+            return `
+                <div class="popup-content">
+                    <div class="popup-header">
+                        <div class="popup-avatar">${avatarContent}</div>
+                        <div>
+                            <div class="popup-name">${member.name}</div>
+                            <div class="popup-role">${member.role}</div>
+                        </div>
+                    </div>
+                    <div class="popup-divider"></div>
+                    <div class="popup-section">
+                        <div class="popup-section-label">Location</div>
+                        <div class="popup-location">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path fill-rule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 3.828 3.025ZM12 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+                            </svg>
+                            ${member.city}, ${member.country}
+                        </div>
+                    </div>
+                    <div class="popup-section">
+                        <div class="popup-section-label">Languages</div>
+                        <div class="popup-languages">${languagesHtml}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Create popup HTML for a city with multiple members
+        function createCityPopup(cityData) {
+            const membersHtml = cityData.members.map(member => {
+                const flagsHtml = member.languages.map(lang => languageFlags[lang.toLowerCase()] || '🌐').join('');
+                const avatarContent = member.photo_url 
+                    ? `<img src="${member.photo_url}" alt="${member.name}" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
+                    : getInitials(member.name);
+                return `
+                    <div class="city-member-item" data-member='${JSON.stringify(member).replace(/'/g, "&#39;")}'>
+                        <div class="city-member-avatar">${avatarContent}</div>
+                        <div class="city-member-info">
+                            <div class="city-member-name">${member.name}</div>
+                            <div class="city-member-role">${member.role}</div>
+                        </div>
+                        <div class="city-member-languages">${flagsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="city-popup-content">
+                    <div class="city-popup-header">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path fill-rule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 3.828 3.025ZM12 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+                        </svg>
+                        <div class="city-popup-title">${cityData.city}</div>
+                        <div class="city-popup-count">${cityData.members.length} members</div>
+                    </div>
+                    <div class="city-member-list">${membersHtml}</div>
+                </div>
+            `;
+        }
+
+        // Initialize map
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: [20, 30],
+            zoom: 2,
+            projection: 'globe',
+            antialias: true
+        });
+
+        map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+        map.on('style.load', () => {
+            map.setFog({
+                color: 'rgb(10, 10, 15)',
+                'high-color': 'rgb(20, 20, 30)',
+                'horizon-blend': 0.08,
+                'space-color': 'rgb(5, 5, 10)',
+                'star-intensity': 0.6
+            });
+        });
+
+        // Store markers for cleanup
+        let markers = [];
+
+        // Add markers to map
+        function addMarkers(teamData) {
+            // Clear existing markers
+            markers.forEach(m => m.remove());
+            markers = [];
+
+            // Group team members by city
+            const cityGroups = {};
+            teamData.forEach(member => {
+                const key = `${member.lat},${member.lng}`;
+                if (!cityGroups[key]) {
+                    cityGroups[key] = {
+                        city: member.city,
+                        country: member.country,
+                        lat: member.lat,
+                        lng: member.lng,
+                        members: []
+                    };
+                }
+                cityGroups[key].members.push(member);
+            });
+
+            // Update stats
+            const allLanguages = new Set();
+            teamData.forEach(m => m.languages.forEach(l => allLanguages.add(l.toLowerCase())));
+            
+            document.getElementById('statMembers').textContent = teamData.length;
+            document.getElementById('statCities').textContent = Object.keys(cityGroups).length;
+            document.getElementById('statLanguages').textContent = allLanguages.size;
+
+            // Create markers
+            Object.values(cityGroups).forEach(cityData => {
+                const el = document.createElement('div');
+                
+                if (cityData.members.length === 1) {
+                    el.className = 'single-marker';
+                } else {
+                    el.className = 'cluster-marker';
+                    el.style.width = `${32 + cityData.members.length * 4}px`;
+                    el.style.height = `${32 + cityData.members.length * 4}px`;
+                    el.textContent = cityData.members.length;
+                }
+
+                const popup = new mapboxgl.Popup({
+                    offset: 25,
+                    closeButton: true,
+                    closeOnClick: true,
+                    maxWidth: '340px'
+                });
+
+                if (cityData.members.length === 1) {
+                    popup.setHTML(createMemberPopup(cityData.members[0]));
+                } else {
+                    popup.setHTML(createCityPopup(cityData));
+                    
+                    popup.on('open', () => {
+                        document.querySelectorAll('.city-member-item').forEach(item => {
+                            item.addEventListener('click', (e) => {
+                                const memberData = JSON.parse(item.dataset.member);
+                                popup.setHTML(createMemberPopup(memberData));
+                            });
+                        });
+                    });
+                }
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([cityData.lng, cityData.lat])
+                    .setPopup(popup)
+                    .addTo(map);
+                
+                markers.push(marker);
+            });
+        }
+
+        // Fetch and load data
+        async function loadData() {
+            const loadingText = document.querySelector('.loading-text');
+            try {
+                loadingText.textContent = 'Fetching data from Google Sheets...';
+                
+                // Use allorigins proxy for CORS
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(GOOGLE_SHEET_CSV_URL);
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                loadingText.textContent = 'Parsing team data...';
+                const csv = await response.text();
+                
+                // Debug: check if we got data
+                console.log('CSV received, length:', csv.length);
+                console.log('First 500 chars:', csv.substring(0, 500));
+                
+                if (!csv || csv.length < 50) {
+                    throw new Error('Empty or invalid CSV response');
+                }
+                
+                const rawData = parseCSV(csv);
+                console.log('Parsed rows:', rawData.length);
+                
+                if (rawData.length === 0) {
+                    throw new Error('No data rows found in CSV');
+                }
+                
+                const teamData = processTeamData(rawData);
+                console.log('Processed team members:', teamData.length);
+                
+                loadingText.textContent = 'Placing markers...';
+                addMarkers(teamData);
+                
+                // Hide loading overlay
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                
+                // Fly to show team distribution
+                setTimeout(() => {
+                    map.flyTo({
+                        center: [10, 45],
+                        zoom: 3.5,
+                        duration: 2000,
+                        essential: true
+                    });
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div class="error-message">
+                        <h2>Unable to Load Data</h2>
+                        <p>Check that the Google Sheet is published and accessible.</p>
+                        <p style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load data when map is ready
+        map.on('load', loadData);
+    </script>
+</body>
+</html>

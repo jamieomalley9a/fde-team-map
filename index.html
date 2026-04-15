@@ -811,10 +811,6 @@
                 
                 setTimeout(() => {
                     map.flyTo({ center: [10, 45], zoom: 3.5, duration: 2000 });
-                    // Start slow spin after fly-to completes
-                    setTimeout(() => {
-                        spinGlobe();
-                    }, 2500);
                 }, 500);
             } catch (error) {
                 console.error('Error:', error);

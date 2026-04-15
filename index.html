@@ -572,6 +572,35 @@
             });
         }
 
+        // Transform Google Drive URLs to working format
+        // Old format (deprecated): https://drive.google.com/uc?export=view&id=FILE_ID
+        // New format (working): https://lh3.googleusercontent.com/d/FILE_ID
+        function transformPhotoUrl(url) {
+            if (!url || typeof url !== 'string') return '';
+            url = url.trim();
+            
+            // Handle the deprecated uc?export=view format
+            const ucMatch = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+            if (ucMatch) {
+                return `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
+            }
+            
+            // Handle /file/d/FILE_ID/view format
+            const fileMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (fileMatch) {
+                return `https://lh3.googleusercontent.com/d/${fileMatch[1]}`;
+            }
+            
+            // Handle /open?id=FILE_ID format
+            const openMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+            if (openMatch) {
+                return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
+            }
+            
+            // Return as-is if not a Google Drive URL (e.g., direct image hosts)
+            return url;
+        }
+
         function processTeamData(rawData) {
             return rawData.map(row => {
                 const cityKey = (row.city || '').toLowerCase().trim();
@@ -584,7 +613,7 @@
                     city: row.city || 'London',
                     country: row.country || 'United Kingdom',
                     languages: languages,
-                    photo_url: row.photo_url || '',
+                    photo_url: transformPhotoUrl(row.photo_url),
                     lat: coords.lat,
                     lng: coords.lng
                 };
@@ -602,7 +631,7 @@
             }).join('');
 
             const avatarContent = member.photo_url 
-                ? `<img src="${member.photo_url}" alt="${member.name}" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
+                ? `<img src="${member.photo_url}" alt="${member.name}" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
                 : getInitials(member.name);
 
             return `
@@ -635,7 +664,7 @@
             const membersHtml = cityData.members.map(member => {
                 const flagsHtml = member.languages.map(lang => languageFlags[lang.toLowerCase()] || '🌐').join('');
                 const avatarContent = member.photo_url 
-                    ? `<img src="${member.photo_url}" alt="${member.name}" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
+                    ? `<img src="${member.photo_url}" alt="${member.name}" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
                     : getInitials(member.name);
                 return `
                     <div class="city-member-item" data-member='${JSON.stringify(member).replace(/'/g, "&#39;")}'>

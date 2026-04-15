@@ -358,6 +358,8 @@
                         'star-intensity': 0.6
                     });
                 }
+                // Re-add night layer after style change
+                addNightLayer();
                 // Re-add markers after style change
                 if (window.currentTeamData) {
                     addMarkers(window.currentTeamData);
@@ -524,6 +526,66 @@
             'hebrew': '🇮🇱', 'thai': '🇹🇭', 'vietnamese': '🇻🇳'
         };
 
+        // City to IANA timezone mapping
+        const cityTimezones = {
+            'london': 'Europe/London', 'paris': 'Europe/Paris', 'berlin': 'Europe/Berlin',
+            'munich': 'Europe/Berlin', 'munster': 'Europe/Berlin', 'sydney': 'Australia/Sydney',
+            'tokyo': 'Asia/Tokyo', 'osaka': 'Asia/Tokyo', 'kyoto': 'Asia/Tokyo',
+            'bucharest': 'Europe/Bucharest', 'riyadh': 'Asia/Riyadh', 'jeddah': 'Asia/Riyadh',
+            'madrid': 'Europe/Madrid', 'ottawa': 'America/Toronto', 'cairo': 'Africa/Cairo',
+            'warsaw': 'Europe/Warsaw', 'cardiff': 'Europe/London', 'saundersfoot': 'Europe/London',
+            'brussels': 'Europe/Brussels', 'amsterdam': 'Europe/Amsterdam',
+            'dubai': 'Asia/Dubai', 'abu dhabi': 'Asia/Dubai', 'singapore': 'Asia/Singapore',
+            'hong kong': 'Asia/Hong_Kong', 'melbourne': 'Australia/Melbourne',
+            'toronto': 'America/Toronto', 'vancouver': 'America/Vancouver',
+            'montreal': 'America/Montreal', 'new york': 'America/New_York',
+            'san francisco': 'America/Los_Angeles', 'los angeles': 'America/Los_Angeles',
+            'chicago': 'America/Chicago', 'seattle': 'America/Los_Angeles',
+            'dublin': 'Europe/Dublin', 'prague': 'Europe/Prague', 'vienna': 'Europe/Vienna',
+            'zurich': 'Europe/Zurich', 'geneva': 'Europe/Zurich', 'stockholm': 'Europe/Stockholm',
+            'copenhagen': 'Europe/Copenhagen', 'lisbon': 'Europe/Lisbon',
+            'barcelona': 'Europe/Madrid', 'rome': 'Europe/Rome', 'milan': 'Europe/Rome',
+            'bangalore': 'Asia/Kolkata', 'mumbai': 'Asia/Kolkata', 'delhi': 'Asia/Kolkata',
+            'hyderabad': 'Asia/Kolkata', 'seoul': 'Asia/Seoul', 'beijing': 'Asia/Shanghai',
+            'shanghai': 'Asia/Shanghai', 'shenzhen': 'Asia/Shanghai',
+            'kuala lumpur': 'Asia/Kuala_Lumpur', 'bangkok': 'Asia/Bangkok',
+            'jakarta': 'Asia/Jakarta', 'manila': 'Asia/Manila',
+            'ho chi minh city': 'Asia/Ho_Chi_Minh', 'hanoi': 'Asia/Bangkok',
+            'cape town': 'Africa/Johannesburg', 'johannesburg': 'Africa/Johannesburg',
+            'tel aviv': 'Asia/Jerusalem', 'sao paulo': 'America/Sao_Paulo',
+            'mexico city': 'America/Mexico_City'
+        };
+
+        // Get local time for a city
+        function getLocalTime(city) {
+            const cityKey = city.toLowerCase().trim();
+            const timezone = cityTimezones[cityKey] || 'UTC';
+            
+            try {
+                const now = new Date();
+                const options = { 
+                    timeZone: timezone, 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                };
+                const timeStr = now.toLocaleTimeString('en-GB', options);
+                
+                // Get day info to show if it's a different day
+                const dayOptions = { timeZone: timezone, weekday: 'short' };
+                const dayStr = now.toLocaleDateString('en-GB', dayOptions);
+                
+                // Check if it's daytime (6am-6pm rough estimate)
+                const hour = parseInt(timeStr.split(':')[0]);
+                const isDaytime = hour >= 6 && hour < 18;
+                const icon = isDaytime ? '☀️' : '🌙';
+                
+                return `${icon} ${timeStr} ${dayStr}`;
+            } catch (e) {
+                return '🕐 --:--';
+            }
+        }
+
         // =====================================================
         // DATA LOADING VIA GOOGLE SHEETS API (no CORS issues)
         // =====================================================
@@ -640,6 +702,8 @@
                 ? `<img src="${member.photo_url}" alt="${member.name}" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='${getInitials(member.name)}'">`
                 : getInitials(member.name);
 
+            const localTime = getLocalTime(member.city);
+
             return `
                 <div class="popup-content">
                     <div class="popup-header">
@@ -657,6 +721,15 @@
                                 <path fill-rule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 3.828 3.025ZM12 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
                             </svg>
                             ${member.city}, ${member.country}
+                        </div>
+                    </div>
+                    <div class="popup-section">
+                        <div class="popup-section-label">Local Time</div>
+                        <div class="popup-location">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clip-rule="evenodd" />
+                            </svg>
+                            ${localTime}
                         </div>
                     </div>
                     <div class="popup-section">
@@ -707,6 +780,98 @@
 
         map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
+        // =====================================================
+        // DAY/NIGHT TERMINATOR
+        // =====================================================
+        
+        // Calculate sun position based on current time
+        function getSunPosition() {
+            const now = new Date();
+            const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+            const hour = now.getUTCHours() + now.getUTCMinutes() / 60;
+            
+            // Solar declination (simplified)
+            const declination = -23.45 * Math.cos((360 / 365) * (dayOfYear + 10) * Math.PI / 180);
+            
+            // Sun longitude (opposite of UTC time converted to degrees)
+            const sunLng = -((hour / 24) * 360 - 180);
+            
+            return { lat: declination, lng: sunLng };
+        }
+        
+        // Generate night polygon coordinates
+        function generateNightPolygon() {
+            const sun = getSunPosition();
+            const points = [];
+            const nightPoints = [];
+            
+            // Generate terminator line
+            for (let lng = -180; lng <= 180; lng += 2) {
+                const lngRad = lng * Math.PI / 180;
+                const sunLngRad = sun.lng * Math.PI / 180;
+                const sunLatRad = sun.lat * Math.PI / 180;
+                
+                // Calculate terminator latitude at this longitude
+                const hourAngle = lngRad - sunLngRad;
+                const lat = Math.atan(-Math.cos(hourAngle) / Math.tan(sunLatRad)) * 180 / Math.PI;
+                
+                points.push([lng, lat]);
+            }
+            
+            // Create night polygon (the side away from the sun)
+            // Add terminator points
+            for (let i = 0; i < points.length; i++) {
+                nightPoints.push(points[i]);
+            }
+            
+            // Close the polygon on the night side
+            // Determine which pole is in darkness
+            const nightPoleDirection = sun.lat > 0 ? -90 : 90;
+            
+            nightPoints.push([180, points[points.length - 1][1]]);
+            nightPoints.push([180, nightPoleDirection]);
+            nightPoints.push([-180, nightPoleDirection]);
+            nightPoints.push([-180, points[0][1]]);
+            nightPoints.push(points[0]);
+            
+            return nightPoints;
+        }
+        
+        function addNightLayer() {
+            const nightCoords = generateNightPolygon();
+            
+            if (map.getSource('night-source')) {
+                map.getSource('night-source').setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [nightCoords]
+                    }
+                });
+            } else {
+                map.addSource('night-source', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: [nightCoords]
+                        }
+                    }
+                });
+                
+                map.addLayer({
+                    id: 'night-layer',
+                    type: 'fill',
+                    source: 'night-source',
+                    paint: {
+                        'fill-color': '#000000',
+                        'fill-opacity': 0.35
+                    }
+                });
+            }
+        }
+
         map.on('style.load', () => {
             map.setFog({
                 color: 'rgb(10, 10, 15)',
@@ -715,6 +880,12 @@
                 'space-color': 'rgb(5, 5, 10)',
                 'star-intensity': 0.6
             });
+            
+            // Add night overlay
+            addNightLayer();
+            
+            // Update every minute
+            setInterval(addNightLayer, 60000);
         });
 
         let markers = [];
